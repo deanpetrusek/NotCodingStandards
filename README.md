@@ -141,4 +141,53 @@ The benefit there is that our handler can describe its own dependencies and we'r
 Another benefit is that we can keep a 1-to-1 mapping of feature to implementation. We don't have to call bloated service classes with possible side effects. If we need another feature that is similar, instead of reusing mediator handlers we can create a new one. This allows us to implement each feature given that feature's specific needs. 
 
 Here is a complete example:
+```
+[Route("api/Purchases")]
+    public class PurchasesController : Controller
+    {
+        private readonly IMediator _mediator;
 
+        public PurchasesController(IMediator mediator)
+        {
+            _mediator = mediator;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Get()
+        {
+            try
+            {
+                var allPurchases = await _mediator.Request(new GetPurchases());
+                return Ok(allPurchases);
+            }
+            catch(Exception ex)
+            {
+                return new InternalServerError(ex);
+            }
+        }
+
+
+
+        [HttpGet]
+        [Route("{id}")]
+        public async Task<IActionResult> Get(string id)
+        {
+            try
+            {
+                var purchase = await _mediator.Request(new GetPurchase(id));
+                if(purchase == null){
+                    return NotFound();
+                }
+                return Ok(purchase);
+            }
+            catch (Exception ex)
+            {
+                return new InternalServerError(ex);
+            }
+        }
+    }
+```
+
+You'll notice that we end up doing the same thing each time, wrap everything in a try catch to return an `internal server error` or check the return value of the request for `null` and then return `NotFound` from the controller. These sorts of actions are required to make a feature happen, but aren't part of the acceptance criteria. They're a necessary evil that are a required part of the implementation of the "real feature" which is getting the purchases in this case. We call those sorts of things "cross cutting concerns" and it's usually best to find an available opportunity to abstract them away so we don't need to deal with them. In this case, we could probably use global filters to catch specific exceptions `EntityNotFound` or the general case `Exception` and form the appropriate response to the caller.
+
+-------------------------------------
